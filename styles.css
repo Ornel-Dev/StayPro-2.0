@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body { 
+    font-family: 'Inter', sans-serif; 
+}
+
+.chart-container { 
+    position: relative; 
+    width: 100%; 
+    max-width: 600px; 
+    margin-left: auto; 
+    margin-right: auto; 
+    height: 300px; 
+    max-height: 400px; 
+}
+
+@media (min-width: 768px) { 
+    .chart-container { 
+        height: 350px; 
+    } 
+}
+
+.sidebar-icon { 
+    width: 1.5rem; 
+    height: 1.5rem; 
+}
+
+.active-link { 
+    background-color: #475569; 
+    color: white; 
+}
+
+.sidebar-transition { 
+    transition: transform 0.3s ease-in-out; 
+}

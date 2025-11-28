@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control Interactivo | Hotel Habitat</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="app">
+
+        <div id="loginScreen" class="flex items-center justify-center min-h-screen bg-slate-200">
+            <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-lg m-4">
+                <div class="text-center">
+                    <h1 class="text-3xl font-bold text-slate-700">🏨 Hotel Habitat</h1>
+                    <p class="text-slate-500">Panel de Control by Staypro</p>
+                </div>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label for="username" class="text-sm font-medium text-slate-600">Usuario</label>
+                        <input type="text" id="username" value="admin" class="w-full px-4 py-2 mt-1 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:outline-none" required>
+                    </div>
+                    <div>
+                        <label for="password" class="text-sm font-medium text-slate-600">Contraseña</label>
+                        <input type="password" id="password" value="admin123" class="w-full px-4 py-2 mt-1 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:outline-none" required>
+                    </div>
+                    <button type="submit" class="w-full px-4 py-2 font-semibold text-white bg-slate-600 rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors">
+                        Iniciar Sesión
+                    </button>
+                </form>
+                <div id="loginError" class="hidden text-sm text-center text-red-500"></div>
+            </div>
+        </div>
+
+        <div id="dashboard" class="hidden">
+            <div class="relative min-h-screen md:flex">
+                <div id="sidebarOverlay" class="fixed inset-0 z-20 bg-black bg-opacity-50 hidden md:hidden"></div>
+
+                <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 flex-shrink-0 w-64 p-4 space-y-4 text-white bg-slate-800 transform -translate-x-full md:relative md:translate-x-0 sidebar-transition">
+                    <div class="text-2xl font-bold text-center">Hotel Habitat</div>
+                    <nav id="navButtons" class="flex-grow space-y-2"></nav>
+                    <div class="pt-4 border-t border-slate-700">
+                        <div class="flex items-center gap-3">
+                            <div id="userAvatar" class="flex items-center justify-center w-10 h-10 font-bold bg-slate-600 rounded-full"></div>
+                            <div>
+                                <div id="currentUser" class="font-semibold"></div>
+                                <div id="currentRole" class="text-xs text-slate-400"></div>
+                            </div>
+                        </div>
+                        <button onclick="App.logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 mt-4 text-sm bg-slate-700 rounded-lg hover:bg-slate-600">
+                            <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </aside>
+
+                <div class="flex-1 flex flex-col">
+                    <header class="md:hidden flex justify-between items-center p-4 bg-white shadow-md">
+                         <button id="hamburgerButton">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                         </button>
+                         <h2 id="mobileHeaderTitle" class="text-xl font-bold">Dashboard</h2>
+                    </header>
+
+                    <main class="flex-1 p-4 md:p-6 overflow-y-auto">
+                        <div id="homeSection" class="section">
+                            <h2 class="text-3xl font-bold mb-6">Vista General</h2>
+                            <p class="mb-8 text-slate-600 max-w-4xl">Bienvenido al panel de control. Esta sección ofrece un resumen en tiempo real del estado del hotel. Utilice las tarjetas para ver los indicadores clave de rendimiento (KPIs) y el gráfico para entender la distribución actual de las habitaciones. Esta vista está diseñada para darle una comprensión inmediata de las operaciones diarias.</p>
+                            <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"></div>
+                            <div class="p-4 sm:p-6 bg-white rounded-2xl shadow-lg">
+                                 <h3 class="text-xl font-bold mb-4">Distribución de Habitaciones</h3>
+                                 <div class="chart-container">
+                                    <canvas id="roomStatusChart"></canvas>
+                                 </div>
+                            </div>
+                        </div>
+
+                        <div id="reservationsSection" class="section hidden">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                                <h2 class="text-3xl font-bold">Gestión de Reservas</h2>
+                                <button onclick="App.openModal('reservationModal')" class="w-full sm:w-auto px-4 py-2 font-semibold text-white bg-slate-600 rounded-lg hover:bg-slate-700">Nueva Reserva</button>
+                            </div>
+                            <p class="mb-8 text-slate-600 max-w-4xl">Aquí puede gestionar todas las reservas de los clientes. La tabla muestra las reservas confirmadas, en curso y canceladas. Utilice el botón "Nueva Reserva" para añadir una nueva entrada o las acciones en cada fila para realizar check-in o cancelar una reserva existente. Cada acción clave requerirá una confirmación para evitar errores.</p>
+                            <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="border-b border-slate-200">
+                                                <th class="p-4">Cliente</th><th class="p-4">Habitación</th><th class="p-4">Fechas</th><th class="p-4">Estado</th><th class="p-4">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="reservationsTable"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="roomsSection" class="section hidden">
+                            <h2 class="text-3xl font-bold mb-6">Estado de Habitaciones</h2>
+                            <p class="mb-8 text-slate-600 max-w-4xl">Esta vista proporciona un mapa visual del estado actual de todas las habitaciones del hotel. Cada tarjeta representa una habitación y su color indica su estado: disponible, ocupada, en limpieza o en mantenimiento. Puede realizar acciones rápidas como enviar una habitación a mantenimiento o marcarla como lista después de una limpieza.</p>
+                            <div id="roomsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div>
+                        </div>
+                        
+                        <div id="cleaningSection" class="section hidden">
+                             <h2 class="text-3xl font-bold mb-6">Gestión de Limpieza</h2>
+                             <p class="mb-8 text-slate-600 max-w-4xl">Diseñada para el personal de limpieza, esta sección muestra únicamente las habitaciones que requieren atención. Las tarjetas indican si una habitación está pendiente de limpiar o si el proceso ya ha comenzado. Utilice los botones para actualizar el estado de la limpieza en tiempo real, asegurando una comunicación eficiente con recepción.</p>
+                             <div id="cleaningRooms" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+                        </div>
+
+                        <div id="reportsSection" class="section hidden">
+                            <h2 class="text-3xl font-bold mb-6">Informes y Analíticas</h2>
+                            <p class="mb-8 text-slate-600 max-w-4xl">Esta es el área de inteligencia de negocio del hotel. Los gráficos interactivos le permiten analizar tendencias clave a lo largo del tiempo. Explore los ingresos generados, la tasa de ocupación por tipo de habitación y los patrones de consumo para tomar decisiones estratégicas informadas y optimizar las operaciones del hotel.</p>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div class="p-4 sm:p-6 bg-white rounded-2xl shadow-lg">
+                                    <h3 class="text-xl font-bold mb-4">Ingresos por Día</h3>
+                                    <div class="chart-container h-80">
+                                        <canvas id="revenueChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="p-4 sm:p-6 bg-white rounded-2xl shadow-lg">
+                                    <h3 class="text-xl font-bold mb-4">Tasa de Ocupación por Tipo</h3>
+                                    <div class="chart-container h-80">
+                                        <canvas id="occupancyTypeChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="usersSection" class="section hidden">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                                <h2 class="text-3xl font-bold">Gestión de Usuarios</h2>
+                                <button onclick="App.openModal('userModal')" class="w-full sm:w-auto px-4 py-2 font-semibold text-white bg-slate-600 rounded-lg hover:bg-slate-700">Nuevo Usuario</button>
+                            </div>
+                            <p class="mb-8 text-slate-600 max-w-4xl">Esta sección de administración permite gestionar las cuentas de usuario del personal. Desde aquí puede añadir nuevos empleados, ver sus roles y eliminar cuentas que ya no estén activas. La gestión adecuada de usuarios es crucial para mantener la seguridad y la integridad de los datos del sistema.</p>
+                            <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="border-b border-slate-200">
+                                                <th class="p-4">Usuario</th><th class="p-4">Nombre</th><th class="p-4">Rol</th><th class="p-4">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usersTable"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="reservationModal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+            <h3 class="text-xl font-bold mb-4">Nueva Reserva</h3>
+            <form id="reservationForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="clientName" placeholder="Nombre del Cliente" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                    <input type="email" id="clientEmail" placeholder="Email" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="date" id="checkinDate" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                    <input type="date" id="checkoutDate" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                </div>
+                <select id="roomSelect" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required></select>
+                <div class="flex justify-end gap-4">
+                    <button type="button" onclick="App.closeModal('reservationModal')" class="px-4 py-2 bg-slate-200 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-white bg-slate-600 rounded-lg">Crear Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="userModal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+            <h3 class="text-xl font-bold mb-4">Nuevo Usuario</h3>
+            <form id="userForm" class="space-y-4">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="newUsername" placeholder="Nombre de usuario" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                    <input type="password" id="newPassword" placeholder="Contraseña" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="newFullName" placeholder="Nombre Completo" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                    <select id="newUserRole" class="w-full px-4 py-2 bg-slate-50 border rounded-lg" required>
+                        <option value="recepcionista">Recepcionista</option>
+                        <option value="limpieza">Personal de Limpieza</option>
+                        <option value="administrador">Administrador</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" onclick="App.closeModal('userModal')" class="px-4 py-2 bg-slate-200 rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-white bg-slate-600 rounded-lg">Crear Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <h3 id="confirmTitle" class="text-lg font-bold mb-2">Confirmar Acción</h3>
+            <p id="confirmMessage" class="text-slate-600 mb-6">¿Está seguro?</p>
+            <div class="flex justify-center gap-4">
+                <button id="cancelButton" class="px-6 py-2 bg-slate-200 rounded-lg">Cancelar</button>
+                <button id="confirmButton" class="px-6 py-2 text-white bg-red-500 rounded-lg">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
