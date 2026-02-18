@@ -4,29 +4,44 @@ This repository contains a simple static front-end and a Node.js/Express backend
 
 ## Getting started
 
-1. **Install dependencies** (requires Node.js installed):
+1. **Instalar dependencias** (requiere Node.js):
    ```bash
-   cd "c:\Users\ornel\OneDrive\Desktop\SENA\FASE 3_EJECUCIÓN\ACTIVIDAD DE PROYECTO 7\ENTREGAS\ENTREGAS ZIP\StayPro 2"
+   cd "c:\Users\ornel\OneDrive\Desktop\StayPro 2.5"
    npm install
    ```
 
-2. **Initialize the database** (sqlite3 CLI required, or you can rely on the server to create tables automatically):
+2. **Inicializar la base de datos** *(opcional)*:
+
+- Opción A — con la CLI de sqlite3 instalada:
    ```bash
    npm run init-db
    ```
-   This executes `create_tables.sql` and seeds default users and rooms.
 
-3. **Start the server**:
-   ```bash
-   npm start
-   ```
-   The server listens on http://localhost:3000 by default and also serves the static files (`index.html`, `script.js`, `styles.css`).
+- Opción B — sin la CLI: el servidor crea las tablas automáticamente al arrancar si no existe `hotel.db`.
 
-4. **Open the front-end** in your browser:
-   - Navigate to `http://localhost:3000/` and log in with one of the seeded accounts:
+3. **Arrancar la app**:
+
+    - Usar el script de producción:
+       ```bash
+       npm start
+       ```
+
+    - Para desarrollo con recarga automática (instala devDependencies si no están):
+       ```bash
+       npm run dev
+       ```
+
+    El servidor sirve `index.html`, `script.js` y `styles.css` en http://localhost:3000 por defecto.
+
+4. **Abrir la UI** en el navegador:
+   - Navega a `http://localhost:3000/` y usa una cuenta inicial (seeded) para pruebas:
      - `admin` / `admin123` (administrator)
      - `recepcion` / `recep123` (receptionist)
      - `limpieza` / `limpieza123` (cleaning)
+
+## Variables de entorno
+
+Puedes configurar el puerto y la ruta de la base de datos con un archivo `.env`. Un ejemplo está en `.env.example`.
 
 ## API endpoints
 
