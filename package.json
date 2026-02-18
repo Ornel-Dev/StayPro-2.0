@@ -1,0 +1,16 @@
+{
+  "name": "staypro-backend",
+  "version": "1.0.0",
+  "description": "API backend for StayPro hotel control panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "init-db": "sqlite3 hotel.db < create_tables.sql"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.4"
+  }
+}

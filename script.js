@@ -11,6 +11,35 @@ const App = (() => {
     // colección de instancias de Chart.js para poder eliminarlas al cambiar sección
     let charts = {};
 
+    // base URL para peticiones al backend (servidor Express)
+    const API_BASE = '';
+
+    // helpers genéricos para llamar al API REST
+    async function apiRequest(path, method = 'GET', body = null) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(`${API_BASE}/api/${path}`, opts);
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`API ${method} /${path} falló: ${res.status} ${text}`);
+        }
+        return res.json();
+    }
+
+    // wrapper para actualizar un solo cuarto en el backend
+    async function updateRoom(number, changes) {
+        return apiRequest(`rooms/${number}`, 'PUT', changes);
+    }
+
+    // wrapper para actualizar o crear reservas
+    async function updateReservation(id, changes) {
+        if (id) {
+            return apiRequest(`reservations/${id}`, 'PUT', changes);
+        } else {
+            return apiRequest('reservations', 'POST', changes);
+        }
+    }
+
     // el estado de la aplicación contiene usuarios, habitaciones, reservas y consumos
     const state = {
         users: {
@@ -74,10 +103,35 @@ const App = (() => {
         cancelButton: document.getElementById('cancelButton'),
     };
 
+    // guarda el usuario actual en localStorage para mantener sesión
+    function saveSession() {
+        if (currentUser) {
+            localStorage.setItem('staypro_user', currentUser);
+        }
+    }
+
+    // elimina datos de sesión
+    function clearSession() {
+        localStorage.removeItem('staypro_user');
+    }
+
+    // intenta restaurar la sesión si hay un usuario persistido
+    function loadSession() {
+        const stored = localStorage.getItem('staypro_user');
+        if (stored && state.users[stored]) {
+            currentUser = stored;
+            currentRole = state.users[stored].role;
+            DOM.loginScreen.classList.add('hidden');
+            DOM.dashboard.classList.remove('hidden');
+            renderDashboard();
+        }
+    }
+
     // punto de entrada llamado cuando el DOM se carga completamente
-    function init() {
+    async function init() {
         setupEventListeners(); // conecto eventos de la IU
-        initializeData();      // llenar datos iniciales del estado
+        await initializeData();      // llenar datos iniciales del estado
+        loadSession();           // restaurar sesión si existe
     }
 
     // adjunta manejadores de eventos a formularios y botones
@@ -96,29 +150,51 @@ const App = (() => {
     }
 
     // prepara datos iniciales de habitaciones, reservas y consumos
-    function initializeData() {
-        // crea 20 habitaciones numeradas 101-120 con tipos y estado predeterminado
-        for(let i = 101; i <= 120; i++) {
-            state.rooms[i] = { number: i, type: i <= 110 ? 'Individual' : 'Doble', status: 'disponible', price: i <= 110 ? 80 : 120, guest: null, cleaningStatus: 'limpia' };
+    async function initializeData() {
+        try {
+            // load users and rooms from API as before
+            const users = await apiRequest('users');
+            state.users = {};
+            users.forEach(u => state.users[u.username] = u);
+
+            const rooms = await apiRequest('rooms');
+            state.rooms = {};
+            rooms.forEach(r => state.rooms[r.number] = r);
+
+            // ---- new: fetch reservations from backend so they survive reloads ----
+            const reservations = await apiRequest('reservations');
+            state.reservations = reservations;
+
+            // any reservation that is already in progress should keep the room marked occupied
+            state.reservations.forEach(r => {
+                if (r.status === 'en_curso') {
+                    if (state.rooms[r.room]) {
+                        state.rooms[r.room].status = 'ocupada';
+                        state.rooms[r.room].guest = r.clientName;
+                    }
+                }
+            });
+
+            // consumptions remain in memory for now
+            state.consumptions = [];
+        } catch (err) {
+            console.error('No se pudo cargar datos iniciales desde API, usando valores por defecto', err);
+
+            // crea 20 habitaciones numeradas 101-120 con tipos y estado predeterminado
+            for(let i = 101; i <= 120; i++) {
+                state.rooms[i] = { number: i, type: i <= 110 ? 'Individual' : 'Doble', status: 'disponible', price: i <= 110 ? 80 : 120, guest: null, cleaningStatus: 'limpia' };
+            }
+            
+            // reserva de demostración y estados de habitaciones de ejemplo
+            state.reservations = [];
+
+            // no hay ocupaciones por defecto en este modo de demostración
+            
+            state.consumptions = [
+                { room: 101, clientName: 'Ana López', concept: 'minibar', description: 'Bebidas y snacks', quantity: 2, price: 15.50, date: new Date().toLocaleDateString() },
+                { room: 110, clientName: 'Carlos Ruiz', concept: 'lavanderia', description: 'Servicio de lavandería', quantity: 1, price: 25.00, date: new Date().toLocaleDateString() }
+            ];
         }
-        
-        // reserva de demostración y estados de habitaciones de ejemplo
-        state.reservations = [
-            { id: 1, clientName: 'Ana López', clientEmail: 'ana@email.com', clientPhone: '123-456-7890', room: 101, checkin: '2024-05-24', checkout: '2024-05-26', status: 'confirmada', observations: 'Cliente VIP' }
-        ];
-
-        state.rooms[101].status = 'ocupada';
-        state.rooms[101].guest = 'Ana López';
-        state.rooms[105].status = 'limpieza';
-        state.rooms[105].cleaningStatus = 'sucia';
-        state.rooms[110].status = 'ocupada';
-        state.rooms[110].guest = 'Carlos Ruiz';
-        state.rooms[115].status = 'mantenimiento';
-
-        state.consumptions = [
-            { room: 101, clientName: 'Ana López', concept: 'minibar', description: 'Bebidas y snacks', quantity: 2, price: 15.50, date: new Date().toLocaleDateString() },
-            { room: 110, clientName: 'Carlos Ruiz', concept: 'lavanderia', description: 'Servicio de lavandería', quantity: 1, price: 25.00, date: new Date().toLocaleDateString() }
-        ];
     }
 
     // valida credenciales de inicio de sesión con state.users en memoria
@@ -130,6 +206,7 @@ const App = (() => {
         if (user && user.password === password) {
             currentUser = username;
             currentRole = user.role;
+            saveSession();
             DOM.loginScreen.classList.add('hidden');
             DOM.dashboard.classList.remove('hidden');
             renderDashboard();
@@ -143,6 +220,7 @@ const App = (() => {
     function logout() {
         currentUser = null;
         currentRole = null;
+        clearSession();
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
         DOM.loginError.classList.add('hidden');
@@ -284,12 +362,30 @@ const App = (() => {
             limpieza: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', label: 'Limpieza' },
             mantenimiento: { bg: 'bg-slate-200', text: 'text-slate-800', border: 'border-slate-300', label: 'Mantenimiento' }
         };
-        DOM.roomsGrid.innerHTML = Object.values(state.rooms).map(room => `
-            <div class="p-4 rounded-lg border-2 text-center ${statusMap[room.status].bg} ${statusMap[room.status].text} ${statusMap[room.status].border}">
-                <div class="font-bold text-lg">${room.number}</div>
-                <div class="text-xs">${statusMap[room.status].label}</div>
-            </div>
-        `).join('');
+        DOM.roomsGrid.innerHTML = Object.values(state.rooms).map(room => {
+            const base = `
+                <div class="p-4 rounded-lg border-2 text-center ${statusMap[room.status].bg} ${statusMap[room.status].text} ${statusMap[room.status].border}">
+                    <div class="font-bold text-lg">${room.number}</div>
+                    <div class="text-xs">${statusMap[room.status].label}</div>`;
+            // only admins and recepcionistas may change status manually
+            let actions = '';
+            if (currentRole === 'administrador' || currentRole === 'recepcionista') {
+                // solo habitaciones ocupadas pueden ir a limpieza
+                if (room.status === 'ocupada') {
+                    actions += `<button onclick="App.markForCleaning(${room.number})" class="mt-2 w-full text-sm py-1 px-2 bg-amber-500 text-white rounded">Marcar limpieza</button>`;
+                }
+                // solo habitaciones disponibles pueden ir a mantenimiento
+                if (room.status === 'disponible') {
+                    actions += `<button onclick="App.markForMaintenance(${room.number})" class="mt-2 w-full text-sm py-1 px-2 bg-slate-600 text-white rounded">Marcar mantenimiento</button>`;
+                }
+                if (room.status === 'limpieza') {
+                    actions += `<button onclick="App.markForMaintenance(${room.number})" class="mt-2 w-full text-sm py-1 px-2 bg-slate-600 text-white rounded">Enviar a mantenimiento</button>`;
+                } else if (room.status === 'mantenimiento') {
+                    actions += `<button onclick="App.setAvailable(${room.number})" class="mt-2 w-full text-sm py-1 px-2 bg-green-500 text-white rounded">Marcar disponible</button>`;
+                }
+            }
+            return base + actions + `</div>`;
+        }).join('');
     }
     
     // lista habitaciones que necesitan o están en limpieza con botones de acción
@@ -369,10 +465,9 @@ const App = (() => {
     }
 
     // process reservation form submission and add a new reservation
-    function handleNewReservation(e) {
+    async function handleNewReservation(e) {
         e.preventDefault();
-        const newReservation = {
-            id: Date.now(),
+        const payload = {
             clientName: document.getElementById('clientName').value,
             clientEmail: document.getElementById('clientEmail').value,
             room: parseInt(document.getElementById('roomSelect').value),
@@ -380,28 +475,40 @@ const App = (() => {
             checkout: document.getElementById('checkoutDate').value,
             status: 'confirmada'
         };
-        state.reservations.push(newReservation);
-        closeModal('reservationModal');
-        e.target.reset();
-        renderReservations();
+        try {
+            const res = await updateReservation(null, payload);
+            state.reservations.push(res);
+            closeModal('reservationModal');
+            e.target.reset();
+            renderReservations();
+        } catch (err) {
+            alert('Error al crear reserva: ' + err.message);
+        }
     }
     
-    // add a new user from the user form, avoid duplicates
-    function handleNewUser(e) {
+    // add a new user from the user form, persist to backend
+    async function handleNewUser(e) {
         e.preventDefault();
         const username = document.getElementById('newUsername').value;
         if(state.users[username]) {
             alert('El nombre de usuario ya existe.');
             return;
         }
-        state.users[username] = {
+        const payload = {
+            username,
             password: document.getElementById('newPassword').value,
             name: document.getElementById('newFullName').value,
             role: document.getElementById('newUserRole').value
         };
-        closeModal('userModal');
-        e.target.reset();
-        renderUsers();
+        try {
+            const user = await apiRequest('users', 'POST', payload);
+            state.users[user.username] = user;
+            closeModal('userModal');
+            e.target.reset();
+            renderUsers();
+        } catch (err) {
+            alert('Error al crear usuario: ' + err.message);
+        }
     }
 
     // generic helpers to show/hide modal dialogs
@@ -443,12 +550,18 @@ const App = (() => {
             title: 'Confirmar Check-in',
             message: '¿Está seguro de que desea realizar el check-in para esta reserva? La habitación se marcará como ocupada.',
             confirmText: 'Sí, Check-in',
-            onConfirm: () => {
+            onConfirm: async () => {
                 const res = state.reservations.find(r => r.id === id);
                 if (res) {
                     res.status = 'en_curso';
                     state.rooms[res.room].status = 'ocupada';
                     state.rooms[res.room].guest = res.clientName;
+                    try {
+                        await updateRoom(res.room, { status: 'ocupada', guest: res.clientName });
+                        await updateReservation(res.id, { status: 'en_curso' });
+                    } catch (err) {
+                        console.error('Error actualizando habitación o reserva en check-in', err);
+                    }
                     renderReservations();
                 }
             }
@@ -461,12 +574,22 @@ const App = (() => {
             title: 'Cancelar Reserva',
             message: 'Esta acción no se puede deshacer. ¿Está seguro?',
             confirmText: 'Sí, Cancelar',
-            onConfirm: () => {
+            onConfirm: async () => {
                 const res = state.reservations.find(r => r.id === id);
                 if (res) {
                     res.status = 'cancelada';
+                    try {
+                        await updateReservation(res.id, { status: 'cancelada' });
+                    } catch (err) {
+                        console.error('Error actualizando reserva', err);
+                    }
                     if (state.rooms[res.room].status !== 'ocupada') {
                          state.rooms[res.room].status = 'disponible';
+                         try {
+                             await updateRoom(res.room, { status: 'disponible', guest: null });
+                         } catch (err) {
+                             console.error('Error actualizando habitación', err);
+                         }
                     }
                     renderReservations();
                 }
@@ -480,27 +603,81 @@ const App = (() => {
             title: 'Eliminar Usuario',
             message: `¿Está seguro de que desea eliminar al usuario ${username}?`,
             confirmText: 'Sí, Eliminar',
-            onConfirm: () => {
-                delete state.users[username];
-                renderUsers();
+            onConfirm: async () => {
+                try {
+                    await apiRequest(`users/${encodeURIComponent(username)}`, 'DELETE');
+                    delete state.users[username];
+                    renderUsers();
+                } catch (err) {
+                    alert('No se pudo eliminar el usuario: ' + err.message);
+                }
             }
         });
     }
     
     // mark a room as currently being cleaned
-    function startCleaning(roomNumber) {
+    async function startCleaning(roomNumber) {
         state.rooms[roomNumber].cleaningStatus = 'en_proceso';
-        renderCleaning();
-    }
-    
-    // finish cleaning and make the room available again
-    function finishCleaning(roomNumber) {
-        state.rooms[roomNumber].cleaningStatus = 'limpia';
-        state.rooms[roomNumber].status = 'disponible';
+        try {
+            await updateRoom(roomNumber, { cleaningStatus: 'en_proceso' });
+        } catch (err) {
+            console.error('Error actualizando habitación al iniciar limpieza', err);
+        }
         renderCleaning();
     }
 
-    return { init, logout, showSection, openModal, closeModal, checkIn, cancelReservation, deleteUser, startCleaning, finishCleaning };
+    // helpers for administrative status changes
+    async function markForCleaning(number) {
+        // solo ocupadas
+        if (state.rooms[number].status !== 'ocupada') return;
+        state.rooms[number].status = 'limpieza';
+        state.rooms[number].cleaningStatus = 'sucia';
+        try {
+            await updateRoom(number, { status: 'limpieza', cleaningStatus: 'sucia' });
+        } catch (err) {
+            console.error('Error al marcar habitación para limpieza', err);
+        }
+        renderRooms();
+    }
+
+    async function markForMaintenance(number) {
+        // solo disponibles necesiten mantenimiento (o en limpieza enviar a mantenimiento también permitido)
+        if (state.rooms[number].status !== 'disponible' && state.rooms[number].status !== 'limpieza') return;
+        state.rooms[number].status = 'mantenimiento';
+        state.rooms[number].cleaningStatus = 'limpia';
+        state.rooms[number].guest = null;
+        try {
+            await updateRoom(number, { status: 'mantenimiento', cleaningStatus: 'limpia', guest: null });
+        } catch (err) {
+            console.error('Error al marcar habitación para mantenimiento', err);
+        }
+        renderRooms();
+    }
+
+    async function setAvailable(number) {
+        state.rooms[number].status = 'disponible';
+        state.rooms[number].cleaningStatus = 'limpia';
+        state.rooms[number].guest = null;
+        try {
+            await updateRoom(number, { status: 'disponible', cleaningStatus: 'limpia', guest: null });
+        } catch (err) {
+            console.error('Error al marcar habitación disponible', err);
+        }
+        renderRooms();
+    }    
+    // finish cleaning and make the room available again
+    async function finishCleaning(roomNumber) {
+        state.rooms[roomNumber].cleaningStatus = 'limpia';
+        state.rooms[roomNumber].status = 'disponible';
+        try {
+            await updateRoom(roomNumber, { cleaningStatus: 'limpia', status: 'disponible', guest: null });
+        } catch (err) {
+            console.error('Error actualizando habitación al terminar limpieza', err);
+        }
+        renderCleaning();
+    }
+
+    return { init, logout, showSection, openModal, closeModal, checkIn, cancelReservation, deleteUser, startCleaning, finishCleaning, markForCleaning, markForMaintenance, setAvailable };
 })();
 
 window.addEventListener('DOMContentLoaded', App.init);
