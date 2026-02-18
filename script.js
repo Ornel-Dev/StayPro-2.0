@@ -1,9 +1,17 @@
+// La aplicación está implementada como una Expresión de Función
+// Ejecutada Inmediatamente (IIFE) que devuelve un objeto con métodos
+// públicos. Esto ayuda a encapsular variables privadas y evitar
+// contaminar el espacio de nombres global.
 const App = (() => {
+    // rastrea el usuario logueado y su rol
     let currentUser = null;
     let currentRole = null;
+    // sección del panel que se muestra actualmente
     let activeSection = 'homeSection';
+    // colección de instancias de Chart.js para poder eliminarlas al cambiar sección
     let charts = {};
 
+    // el estado de la aplicación contiene usuarios, habitaciones, reservas y consumos
     const state = {
         users: {
             'admin': { password: 'admin123', role: 'administrador', name: 'Admin General' },
@@ -15,6 +23,8 @@ const App = (() => {
         consumptions: []
     };
 
+    // los permisos definen qué elementos del menú lateral puede ver cada rol
+    // cada entrada incluye id, etiqueta, sección a mostrar e ícono SVG
     const rolePermissions = {
         administrador: [
             { id: 'home', label: 'Dashboard', section: 'homeSection', icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />' },
@@ -34,6 +44,7 @@ const App = (() => {
         ]
     };
     
+    // almacena en caché elementos del DOM usados con frecuencia para evitar consultas repetidas
     const DOM = {
         loginForm: document.getElementById('loginForm'),
         loginError: document.getElementById('loginError'),
@@ -63,11 +74,13 @@ const App = (() => {
         cancelButton: document.getElementById('cancelButton'),
     };
 
+    // punto de entrada llamado cuando el DOM se carga completamente
     function init() {
-        setupEventListeners();
-        initializeData();
+        setupEventListeners(); // conecto eventos de la IU
+        initializeData();      // llenar datos iniciales del estado
     }
 
+    // adjunta manejadores de eventos a formularios y botones
     function setupEventListeners() {
         DOM.loginForm.addEventListener('submit', handleLogin);
         DOM.reservationForm.addEventListener('submit', handleNewReservation);
@@ -76,18 +89,20 @@ const App = (() => {
         DOM.sidebarOverlay.addEventListener('click', toggleSidebar);
     }
 
+    // muestra/oculta el menú lateral móvil y la superposición
     function toggleSidebar() {
         DOM.sidebar.classList.toggle('-translate-x-full');
         DOM.sidebarOverlay.classList.toggle('hidden');
     }
 
+    // prepara datos iniciales de habitaciones, reservas y consumos
     function initializeData() {
-        // Inicializar habitaciones
+        // crea 20 habitaciones numeradas 101-120 con tipos y estado predeterminado
         for(let i = 101; i <= 120; i++) {
             state.rooms[i] = { number: i, type: i <= 110 ? 'Individual' : 'Doble', status: 'disponible', price: i <= 110 ? 80 : 120, guest: null, cleaningStatus: 'limpia' };
         }
         
-        // Datos de demo originales
+        // reserva de demostración y estados de habitaciones de ejemplo
         state.reservations = [
             { id: 1, clientName: 'Ana López', clientEmail: 'ana@email.com', clientPhone: '123-456-7890', room: 101, checkin: '2024-05-24', checkout: '2024-05-26', status: 'confirmada', observations: 'Cliente VIP' }
         ];
@@ -106,6 +121,7 @@ const App = (() => {
         ];
     }
 
+    // valida credenciales de inicio de sesión con state.users en memoria
     function handleLogin(e) {
         e.preventDefault();
         const username = document.getElementById('username').value;
@@ -123,6 +139,7 @@ const App = (() => {
         }
     }
 
+    // el cierre de sesión reinicia el estado, limpia campos y vuelve a la pantalla de login
     function logout() {
         currentUser = null;
         currentRole = null;
@@ -136,6 +153,7 @@ const App = (() => {
         }
     }
 
+    // actualiza la UI del panel con la información del usuario y enlaces de navegación
     function renderDashboard() {
         const user = state.users[currentUser];
         DOM.currentUser.textContent = user.name;
@@ -145,6 +163,7 @@ const App = (() => {
         showSection('homeSection');
     }
 
+    // build sidebar links based on rolePermissions and attach click handlers
     function renderNavigation() {
         const permissions = rolePermissions[currentRole] || [];
         DOM.navButtons.innerHTML = permissions.map(perm => `
@@ -164,6 +183,7 @@ const App = (() => {
         });
     }
 
+    // hide all sections and display the selected one; also update header title
     function showSection(sectionId) {
         activeSection = sectionId;
         DOM.sections.forEach(section => section.classList.add('hidden'));
@@ -176,6 +196,7 @@ const App = (() => {
         loadSectionData(sectionId);
     }
 
+    // clear any existing charts for previous section and call renderer for the new section
     function loadSectionData(sectionId) {
         const canvasId = Object.keys(charts).find(key => key.startsWith(sectionId));
         if (canvasId && charts[canvasId]) {
@@ -193,6 +214,7 @@ const App = (() => {
         }
     }
 
+    // construye la vista inicial del panel con estadísticas y gráfico de dona
     function renderHome() {
         const occupied = Object.values(state.rooms).filter(r => r.status === 'ocupada').length;
         const available = Object.values(state.rooms).filter(r => r.status === 'disponible').length;
@@ -226,6 +248,7 @@ const App = (() => {
         renderChart('roomStatusChart', 'doughnut', chartData, { responsive: true, maintainAspectRatio: false });
     }
 
+    // rellena filas de la tabla de reservas y el desplegable de habitaciones
     function renderReservations() {
         DOM.reservationsTable.innerHTML = state.reservations.map(res => {
             const statusClasses = {
@@ -253,6 +276,7 @@ const App = (() => {
             ).join('');
     }
     
+    // muestra una cuadrícula de habitaciones coloreadas según su estado
     function renderRooms() {
         const statusMap = {
             disponible: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', label: 'Disponible' },
@@ -268,6 +292,7 @@ const App = (() => {
         `).join('');
     }
     
+    // lista habitaciones que necesitan o están en limpieza con botones de acción
     function renderCleaning() {
         const dirtyRooms = Object.values(state.rooms).filter(r => r.cleaningStatus === 'sucia' || r.status === 'limpieza');
         if (dirtyRooms.length === 0) {
@@ -286,6 +311,7 @@ const App = (() => {
         `).join('');
     }
 
+    // renderiza gráficos para informes: ingresos y ocupación por tipo
     function renderReports() {
         const revenueData = {
             labels: ['Día -6', 'Día -5', 'Día -4', 'Ayer', 'Hoy'],
@@ -320,6 +346,7 @@ const App = (() => {
         renderChart('occupancyTypeChart', 'bar', occupancyData, { responsive: true, maintainAspectRatio: false, indexAxis: 'y' });
     }
     
+    // rellena tabla de usuarios, excluyendo al admin de borrado
     function renderUsers() {
         DOM.usersTable.innerHTML = Object.entries(state.users).map(([username, user]) => `
             <tr class="border-b border-slate-200 hover:bg-slate-50">
@@ -333,6 +360,7 @@ const App = (() => {
         `).join('');
     }
 
+    // auxiliar para crear/eliminar gráficos de Chart.js y llevar el control
     function renderChart(canvasId, type, data, options) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         const chartId = `${activeSection}-${canvasId}`;
@@ -340,6 +368,7 @@ const App = (() => {
         charts[chartId] = new Chart(ctx, { type, data, options });
     }
 
+    // process reservation form submission and add a new reservation
     function handleNewReservation(e) {
         e.preventDefault();
         const newReservation = {
@@ -357,6 +386,7 @@ const App = (() => {
         renderReservations();
     }
     
+    // add a new user from the user form, avoid duplicates
     function handleNewUser(e) {
         e.preventDefault();
         const username = document.getElementById('newUsername').value;
@@ -374,6 +404,7 @@ const App = (() => {
         renderUsers();
     }
 
+    // generic helpers to show/hide modal dialogs
     function openModal(modalId) {
         document.getElementById(modalId).classList.remove('hidden');
         document.getElementById(modalId).classList.add('flex');
@@ -384,6 +415,7 @@ const App = (() => {
         document.getElementById(modalId).classList.remove('flex');
     }
 
+    // reusable confirmation modal logic for dangerous actions
     function confirmAction({ title, message, confirmText = 'Confirmar', onConfirm }) {
         DOM.confirmTitle.textContent = title;
         DOM.confirmMessage.textContent = message;
@@ -405,6 +437,7 @@ const App = (() => {
         DOM.cancelButton.addEventListener('click', cleanup);
     }
 
+    // change reservation status to in-progress and mark room occupied
     function checkIn(id) {
         confirmAction({
             title: 'Confirmar Check-in',
@@ -422,6 +455,7 @@ const App = (() => {
         });
     }
 
+    // cancel a reservation and free room unless occupied
     function cancelReservation(id) {
         confirmAction({
             title: 'Cancelar Reserva',
@@ -440,6 +474,7 @@ const App = (() => {
         });
     }
     
+    // remove user from state after confirmation (admin can't be deleted via UI)
     function deleteUser(username) {
         confirmAction({
             title: 'Eliminar Usuario',
@@ -452,11 +487,13 @@ const App = (() => {
         });
     }
     
+    // mark a room as currently being cleaned
     function startCleaning(roomNumber) {
         state.rooms[roomNumber].cleaningStatus = 'en_proceso';
         renderCleaning();
     }
     
+    // finish cleaning and make the room available again
     function finishCleaning(roomNumber) {
         state.rooms[roomNumber].cleaningStatus = 'limpia';
         state.rooms[roomNumber].status = 'disponible';
@@ -467,3 +504,4 @@ const App = (() => {
 })();
 
 window.addEventListener('DOMContentLoaded', App.init);
+
