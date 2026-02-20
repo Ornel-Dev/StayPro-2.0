@@ -1,0 +1,19 @@
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# DB / secrets
+hotel.db
+*.sqlite
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# IDE / system files
+*.log
+coverage/
+dist/
+
